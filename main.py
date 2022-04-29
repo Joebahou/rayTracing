@@ -14,77 +14,7 @@ lights = list()
 boxes = list()
 width = 500
 height = 500
-def parsing_scene():
-    """A Helper function that defines the program arguments."""
-    scene_file=sys.argv[1]
-    output_image_name=sys.argv[2]
 
-    if len(sys.argv)>3:
-        width=sys.argv[3]
-        height=sys.argv[4]
-
-    scene_definition_parser(scene_file)
-
-#every point should be numpy array
-
-def get_args_cam(words):
-    cam["pos"] = np.array([words[1],words[2],words[3]])
-    cam["look_at_position"] = np.array([words[4],words[5],words[6]])
-    cam["up_vector"] = np.array([words[7], words[8], words[9]])
-    cam["screen_distance"] = words[10]
-    cam["screen_width"] = words[11]
-
-
-def get_args_set(words):
-    general["background_color"]=np.array([words[1],words[2],words[3]])
-    general["root_num_of_shadow_rays"] = words[4]
-    general["max_recursion"] = words[5]
-
-
-def get_args_mtl(words):
-    mtl = {}
-    mtl["diffuse_color"] = np.array([words[1],words[2],words[3]])
-    mtl["specular_color"] = np.array([words[4],words[5],words[6]])
-    mtl["reflection_color"] = np.array([words[7],words[8],words[9]])
-    mtl["shininess"] = words[10]
-    mtl["transparency"] = words[11]
-    mtls.append(mtl)
-
-
-
-
-def get_args_pln(words):
-    pln = {}
-    pln["normal"] = np.array([words[1], words[2], words[3]])
-    pln["offset"] = words[4]
-    pln["material_index"] = words[5]
-    plns.append(pln)
-
-
-def get_args_sphere(words):
-    sph = {}
-    sph["center"] = np.array([words[1], words[2], words[3]])
-    sph["radius"] = words[4]
-    sph["material_index"] = words[5]
-    spheres.append(sph)
-
-
-def get_args_lgt(words):
-    lgt = {}
-    lgt["position"] = np.array([words[1], words[2], words[3]])
-    lgt["color"] = np.array([words[4], words[5], words[6]])
-    lgt["specular_intensity"] = words[7]
-    lgt["shadow intensity"] = words[8]
-    lgt["radius"] = words[9]
-    lights.append(lgt)
-
-
-def get_args_box(words):
-    box = {}
-    box["center"] = np.array([words[1], words[2], words[3]])
-    box["scale"] = words[4]
-    box["material_index"] = words[5]
-    boxes.append(box)
 
 
 def scene_definition_parser(file_name):
@@ -112,9 +42,83 @@ def scene_definition_parser(file_name):
     f.close()
 
 
+def parsing_scene():
+    """A Helper function that defines the program arguments."""
+    scene_file=sys.argv[1]
+    output_image_name=sys.argv[2]
+
+    if len(sys.argv) > 3:
+        width = sys.argv[3]
+        height = sys.argv[4]
+
+    scene_definition_parser(scene_file)
+
+#every point should be numpy array
+
+def get_args_cam(words):
+    cam["pos"] = np.array([words[1].strip(),words[2].strip(),words[3].strip()])
+    cam["look_at_position"] = np.array([words[4].strip(),words[5].strip(),words[6].strip()])
+    cam["up_vector"] = np.array([words[7].strip(), words[8].strip(), words[9].strip()])
+    cam["screen_distance"] = words[10].strip()
+    cam["screen_width"] = words[11].strip()
+
+
+def get_args_set(words):
+    general["background_color"]=np.array([words[1].strip(),words[2].strip(),words[3].strip()])
+    general["root_num_of_shadow_rays"] = words[4].strip()
+    general["max_recursion"] = words[5].strip()
+
+
+def get_args_mtl(words):
+    mtl = {}
+    mtl["diffuse_color"] = np.array([words[1].strip(),words[2].strip(),words[3].strip()])
+    mtl["specular_color"] = np.array([words[4].strip(),words[5].strip(),words[6].strip()])
+    mtl["reflection_color"] = np.array([words[7].strip(),words[8].strip(),words[9].strip()])
+    mtl["shininess"] = words[10].strip()
+    mtl["transparency"] = words[11].strip()
+    mtls.append(mtl)
+
+
+
+
+def get_args_pln(words):
+    pln = {}
+    pln["normal"] = np.array([words[1].strip(), words[2].strip(), words[3].strip()])
+    pln["offset"] = words[4].strip()
+    pln["material_index"] = words[5].strip()
+    plns.append(pln)
+
+
+def get_args_sphere(words):
+    sph = {}
+    sph["center"] = np.array([words[1].strip(), words[2].strip(), words[3].strip()])
+    sph["radius"] = words[4].strip()
+    sph["material_index"] = words[5].strip()
+    spheres.append(sph)
+
+
+def get_args_lgt(words):
+    lgt = {}
+    lgt["position"] = np.array([words[1].strip(), words[2].strip(), words[3].strip()])
+    lgt["color"] = np.array([words[4].strip(), words[5].strip(), words[6].strip()])
+    lgt["specular_intensity"] = words[7].strip()
+    lgt["shadow intensity"] = words[8].strip()
+    lgt["radius"] = words[9].strip()
+    lights.append(lgt)
+
+
+def get_args_box(words):
+    box = {}
+    box["center"] = np.array([words[1].strip(), words[2].strip(), words[3].strip()])
+    box["scale"] = words[4].strip()
+    box["material_index"] = words[5].strip()
+    boxes.append(box)
+
+
+
 def RayCast():
     image = np.zeros((height, width, 3), dtype=np.float32)
-    E=cam["pos"]
+    E = cam["pos"]
     Vx = np.array([0, 0, 0])
     Vy = np.array([0, 0, 0])
 
