@@ -1,14 +1,16 @@
-from main import cam,general,mtls,plns,spheres,lights,boxes
-import sys
 import numpy as np
-import math
-import os
-from typing import Dict, Any
 
-from PIL import Image
 
-NDArray = Any
-Options = Any
+cam = {}
+general = {}
+mtls = list()
+plns = list()
+
+# [{center:[x,y,z],radius:number,mat_index:number}]
+spheres = list()
+lights = list()
+boxes = list()
+
 
 # every point should be numpy array
 
@@ -74,17 +76,24 @@ def scene_definition_parser(file_name):
     f = open(file_name, "r")
 
     for line in f:
+        line=line.strip()
+
         if not (line.startswith("#") or len(line.strip()) == 0):
-            words = line.split(" ")
+            words = line.replace("\t"," ")
+            words = words.split(" ")
+            input_line=list()
+            for word in words:
+                if len(word.strip()) != 0:
+                    input_line.append(word)
             cases = {
-                "cam": lambda: get_args_cam(words),
-                "set": lambda: get_args_set(words),
-                "mtl": lambda: get_args_mtl(words),
-                "pln": lambda: get_args_pln(words),
-                "sph": lambda: get_args_sphere(words),
-                "lgt": lambda: get_args_lgt(words),
-                "box": lambda: get_args_box(words)
+                "cam": lambda: get_args_cam(input_line),
+                "set": lambda: get_args_set(input_line),
+                "mtl": lambda: get_args_mtl(input_line),
+                "pln": lambda: get_args_pln(input_line),
+                "sph": lambda: get_args_sphere(input_line),
+                "lgt": lambda: get_args_lgt(input_line),
+                "box": lambda: get_args_box(input_line)
             }
-            cases.get(words[0].strip(), lambda: print("Didn't match a case"))()
+            cases.get(input_line[0], lambda: print("Didn't match a case"))()
 
     f.close()

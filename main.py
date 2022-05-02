@@ -5,21 +5,15 @@ import os
 from typing import Dict, Any
 
 from PIL import Image
-
+from parsing import cam,general,mtls,plns,spheres,lights,boxes
 from parsing import scene_definition_parser
 
 NDArray = Any
 Options = Any
+scene_file = None
+output_image_name = ""
 # {pos:[x,y,z], look_at_position:[x,y,z],up vector:[x,y,z], s_d:number,  s_w:number }
-cam = {}
-general = {}
-mtls = list()
-plns = list()
 
-# [{center:[x,y,z],radius:number,mat_index:number}]
-spheres = list()
-lights = list()
-boxes = list()
 width = 500
 height = 500
 
@@ -96,7 +90,7 @@ def intersectionBox(E, V, box):
 
 
 def FindIntersection(E, t, V):
-    # need to do
+    # todo: need to do
     min_t = np.inf
     type_p = ""
     min_primitive = {}
@@ -212,6 +206,9 @@ def RayCast():
 
 def parsing_scene():
     """A Helper function that defines the program arguments."""
+
+    global scene_file
+    global output_image_name
     scene_file = sys.argv[1]
     output_image_name = sys.argv[2]
 
@@ -224,8 +221,6 @@ def parsing_scene():
         height = sys.argv[4]
 
     scene_definition_parser(scene_file)
-    image = RayCast()
-    save_image(image, output_image_name)
 
 
 def normalize_image(image: NDArray):
@@ -250,8 +245,9 @@ def save_image(image: NDArray, image_loc: str):
 
 
 if __name__ == "__main__":
-    # parsing_scene()
-
-    a = np.array([1, 2, 3])
-    b = np.array([1, 2, 3])
-    print(float(1 / 3) * a)
+    parsing_scene()
+    # image = RayCast()
+    # save_image(image, output_image_name)
+    # a = np.array([1, 2, 3])
+    # b = np.array([1, 2, 3])
+    # print(float(1 / 3) * a)
