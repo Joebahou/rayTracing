@@ -5,7 +5,7 @@ import os
 from typing import Dict, Any
 
 from PIL import Image
-from parsing import cam,general,mtls,plns,spheres,lights,boxes
+from parsing import cam, general, mtls, plns, spheres, lights, boxes
 from parsing import scene_definition_parser
 
 NDArray = Any
@@ -119,25 +119,28 @@ def FindIntersection(E, t, V):
 
 def calculate_M(a, b, c):
     Sx = -b
-    Cx = math.sqrt(1 - math.sqrt(Sx))
+    Cx = math.sqrt(1 - Sx*Sx)
     Sy = (-a) / Cx
     Cy = c / Cx
     return {"Sx": Sx, "Cx": Cx, "Sy": Sy, "Cy": Cy}
 
 
-# I = [R,G,B] of the light
-def calculate_I_diff(N, L, I):
-    dot_product = sum(N * L)
-    return dot_product * I
+# I_p = light intensity number
+# K_d = [R,G,B] diffuse surface color
+def calculate_I_diff(N, L, I_p, K_d):
+    dot_product = -sum(N * L)
+    return dot_product * I_p * K_d
 
 
-def calculate_Ipec(Ks, I, R, V, n):
-    dot_product = sum(R * V)
-    return Ks * math.pow(dot_product, n) * I
+# I_p = light intensity number
+# K_s = [R,G,B] specular surface color
+def calculate_Ipec(K_s, I_p, R, V, n):
+    dot_product = -sum(R * V)
+    return math.pow(dot_product, n) * I_p * K_s
 
 
 def normalize(v):
-    return v / math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+    return v / math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
 
 
 def calculate_color(E, V, t, primitive, type):
@@ -150,25 +153,32 @@ def calculate_color(E, V, t, primitive, type):
         N = normalize(P - primitive["center"])
         for light in lights:
             # need to check if the light intersect other objects before that
+            # soft shadows
             # TODO
 
             L = normalize(light["position"] - P)
-            # no Kd in targil(probably 1)
-            I_diff = calculate_I_diff(N, L, light["color"])
+            I_p = 1
+            K_d = primitive_diffuse_color
+            I_diff = calculate_I_diff(N, L, I_p, K_d)
+            color = color+ I_diff * light["color"]
+            '''
             R = (2 * L * N) * N - L
-            Ks = light["specular_intensity"]
-            I_spec = calculate_Ipec(Ks, light["color"], R, V, n)
-            color += I_diff * primitive_diffuse_color + I_spec * primitive_spec_color
-    color = [max(x, 255) for x in color]
+            Ks = primitive_spec_color
+            I_spec = calculate_Ipec(Ks, I_p, R, V, n)
+            color = color + light["specular_intensity"]*light["color"]*I_spec
+            '''
+    color = [min(x, 1) for x in color]
+    color = [max(x, 0) for x in color]
+    #return mtls[primitive["material_index"] - 1]["diffuse_color"]
     return color
 
 
 def RayCast():
-    image = np.zeros((height, width, 3), dtype=np.float32)
+    image = np.zeros((height, width, 3), dtype=np.float64)
     look_at_point = cam["look_at_position"]
     E = cam["pos"]
     f = cam["screen_distance"]
-    P = f * normalize(look_at_point - E)
+    P = E + f * normalize(look_at_point - E)
 
     Vz = (P - E) / f
     M = calculate_M(Vz[0], Vz[1], Vz[2])
@@ -188,19 +198,19 @@ def RayCast():
             # ray
             # p=E+t(p-E)
             t = 1
-            min_object = FindIntersection(E, t, p - E)
+            min_object = FindIntersection(E, t, normalize(p - E))
             if math.isinf(min_object["min_t"]):
                 # no intersection object
                 # TODO
                 image[i][j] = [0, 0, 0]
             else:
-                image[i][j] = calculate_color(E, normalize(-t(p - E)), min_object["min_t"], min_object["min_primitive"],
+                image[i][j] = calculate_color(E, normalize(p - E), min_object["min_t"], min_object["min_primitive"],
                                               min_object["type"])
 
             # update image
             # TODO
-            p = p + Vx
-        P_0 = P_0 + Vy
+            p = p + Vx*(width_screen/width)
+        P_0 = P_0 + Vy*(height_screen/height)
     return image
 
 
@@ -217,8 +227,8 @@ def parsing_scene():
         # change the global width,height
         global width
         global height
-        width = sys.argv[3]
-        height = sys.argv[4]
+        width = int(sys.argv[3])
+        height = int(sys.argv[4])
 
     scene_definition_parser(scene_file)
 
@@ -227,8 +237,8 @@ def normalize_image(image: NDArray):
     """Normalize image pixels to be between [0., 1.0]"""
     min_img = image.min()
     max_img = image.max()
-    normalized_image = (image - min_img) / (max_img - min_img)
-    normalized_image *= 255.0
+    #normalized_image = (image - min_img) / (max_img - min_img)
+    normalized_image = image*255
     return normalized_image
 
 
@@ -246,8 +256,8 @@ def save_image(image: NDArray, image_loc: str):
 
 if __name__ == "__main__":
     parsing_scene()
-    # image = RayCast()
-    # save_image(image, output_image_name)
+    image = RayCast()
+    save_image(image, output_image_name)
     # a = np.array([1, 2, 3])
     # b = np.array([1, 2, 3])
     # print(float(1 / 3) * a)
