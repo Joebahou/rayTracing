@@ -128,14 +128,14 @@ def calculate_M(a, b, c):
 # I_p = light intensity number
 # K_d = [R,G,B] diffuse surface color
 def calculate_I_diff(N, L, I_p, K_d):
-    dot_product = -sum(N * L)
+    dot_product = sum(N * L)
     return dot_product * I_p * K_d
 
 
 # I_p = light intensity number
 # K_s = [R,G,B] specular surface color
 def calculate_Ipec(K_s, I_p, R, V, n):
-    dot_product = -sum(R * V)
+    dot_product = max(-sum(R * V),0)
     return math.pow(dot_product, n) * I_p * K_s
 
 
@@ -161,12 +161,12 @@ def calculate_color(E, V, t, primitive, type):
             K_d = primitive_diffuse_color
             I_diff = calculate_I_diff(N, L, I_p, K_d)
             color = color+ I_diff * light["color"]
-            '''
-            R = (2 * L * N) * N - L
+
+            R = (sum(2 * L * N)) * N - L
             Ks = primitive_spec_color
             I_spec = calculate_Ipec(Ks, I_p, R, V, n)
             color = color + light["specular_intensity"]*light["color"]*I_spec
-            '''
+
     color = [min(x, 1) for x in color]
     color = [max(x, 0) for x in color]
     #return mtls[primitive["material_index"] - 1]["diffuse_color"]
