@@ -145,6 +145,7 @@ def normalize(v):
 
 
 def calculate_color(E, V, t, primitive, type, recursion_level):
+    print("rec: "+str(recursion_level))
     if recursion_level > general["max_recursion"]:
         return general["background_color"]
 
@@ -171,16 +172,17 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
             Ks = primitive_spec_color
             I_spec = calculate_Ipec(Ks, I_p, R, V, n)
             color = color + light["specular_intensity"] * light["color"] * I_spec
+        if recursion_level + 1 > general["max_recursion"]:
+            color = color + primitive_reflection_color * general["background_color"]
+        else:
+            R = V - 2 * (sum(V * N)) * N
+            next_primitive = FindIntersection(P, normalize(R))
+            if not math.isinf(next_primitive["min_t"]):
+                color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
+                                                        next_primitive["min_primitive"],
+                                                        next_primitive["type"], recursion_level + 1)
+                color = color + color_from_reflection * primitive_reflection_color
 
-            if recursion_level+1>general["max_recursion"]:
-                color = color + primitive_reflection_color * general["background_color"]
-            else:
-                next_primitive = FindIntersection(P, normalize(R))
-                if not math.isinf(next_primitive["min_t"]):
-                    color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
-                                                            next_primitive["min_primitive"],
-                                                            next_primitive["type"], recursion_level + 1)
-                    color = color + color_from_reflection * primitive_reflection_color
 
     if type == "pln":
         pln_normal_normalize = normalize(primitive["normal"])
@@ -200,16 +202,18 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
             Ks = primitive_spec_color
             I_spec = calculate_Ipec(Ks, I_p, R, V, n)
             color = color + light["specular_intensity"] * light["color"] * I_spec
+        if recursion_level + 1 > general["max_recursion"]:
+            color = color + primitive_reflection_color * general["background_color"]
+        else:
+            R = V - 2 * (sum(V * N)) * N
+            next_primitive = FindIntersection(P, normalize(R))
+            if not math.isinf(next_primitive["min_t"]):
+                color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
+                                                        next_primitive["min_primitive"],
+                                                        next_primitive["type"], recursion_level + 1)
+                color = color + color_from_reflection * primitive_reflection_color
 
-            if recursion_level+1>general["max_recursion"]:
-                color = color + primitive_reflection_color * general["background_color"]
-            else:
-                next_primitive = FindIntersection(P, normalize(R))
-                if not math.isinf(next_primitive["min_t"]):
-                    color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
-                                                            next_primitive["min_primitive"],
-                                                            next_primitive["type"], recursion_level + 1)
-                    color = color + color_from_reflection * primitive_reflection_color
+
     color = [min(x, 1) for x in color]
     color = [max(x, 0) for x in color]
     # return mtls[primitive["material_index"] - 1]["diffuse_color"]
@@ -226,7 +230,7 @@ def RayCast():
     Vz = (P - E) / f
     M = calculate_M(Vz[0], Vz[1], Vz[2])
     Vx = np.array([M["Cy"], 0, M["Sy"]])
-    Vy = np.array([M["Sx"] * M["Sy"], -M["Cx"], -M["Sx"] * M["Cy"]])
+    Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
 
     width_screen = cam["screen_width"]
     ratio = float(width) / height
@@ -234,7 +238,7 @@ def RayCast():
 
     P_0 = P - float(width_screen / 2) * Vx - float(height_screen / 2) * Vy
 
-    for i in range(0, height):
+    for i in range(height-1,-1,-1):
         p = P_0
         for j in range(0, width):
             # TODO
@@ -301,6 +305,8 @@ def save_image(image: NDArray, image_loc: str):
 if __name__ == "__main__":
     parsing_scene()
     image = RayCast()
+    #image = np.zeros((100, 100, 3), dtype=np.float64)
+    #image[0][0]=[1,0,0]
     save_image(image, output_image_name)
     # a = np.array([1, 2, 3])
     # b = np.array([1, 2, 3])
