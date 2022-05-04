@@ -12,6 +12,7 @@ NDArray = Any
 Options = Any
 scene_file = None
 output_image_name = ""
+
 # {pos:[x,y,z], look_at_position:[x,y,z],up vector:[x,y,z], s_d:number,  s_w:number }
 
 width = 500
@@ -89,7 +90,7 @@ def intersectionBox(E, V, box):
     return t_near
 
 
-def FindIntersection(E, t, V):
+def FindIntersection(E, V):
     # todo: need to do
     min_t = np.inf
     type_p = ""
@@ -119,7 +120,7 @@ def FindIntersection(E, t, V):
 
 def calculate_M(a, b, c):
     Sx = -b
-    Cx = math.sqrt(1 - Sx*Sx)
+    Cx = math.sqrt(1 - Sx * Sx)
     Sy = (-a) / Cx
     Cy = c / Cx
     return {"Sx": Sx, "Cx": Cx, "Sy": Sy, "Cy": Cy}
@@ -135,7 +136,7 @@ def calculate_I_diff(N, L, I_p, K_d):
 # I_p = light intensity number
 # K_s = [R,G,B] specular surface color
 def calculate_Ipec(K_s, I_p, R, V, n):
-    dot_product = max(-sum(R * V),0)
+    dot_product = max(-sum(R * V), 0)
     return math.pow(dot_product, n) * I_p * K_s
 
 
@@ -143,11 +144,15 @@ def normalize(v):
     return v / math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
 
 
-def calculate_color(E, V, t, primitive, type):
+def calculate_color(E, V, t, primitive, type, recursion_level):
+    if recursion_level > general["max_recursion"]:
+        return general["background_color"]
+
     P = E + t * V
     color = np.array([0, 0, 0])
     primitive_diffuse_color = mtls[primitive["material_index"] - 1]["diffuse_color"]
     primitive_spec_color = mtls[primitive["material_index"] - 1]["specular_color"]
+    primitive_reflection_color = mtls[primitive["material_index"] - 1]["reflection_color"]
     n = mtls[primitive["material_index"] - 1]["shininess"]
     if type == "sph":
         N = normalize(P - primitive["center"])
@@ -160,16 +165,54 @@ def calculate_color(E, V, t, primitive, type):
             I_p = 1
             K_d = primitive_diffuse_color
             I_diff = calculate_I_diff(N, L, I_p, K_d)
-            color = color+ I_diff * light["color"]
+            color = color + I_diff * light["color"]
 
             R = (sum(2 * L * N)) * N - L
             Ks = primitive_spec_color
             I_spec = calculate_Ipec(Ks, I_p, R, V, n)
-            color = color + light["specular_intensity"]*light["color"]*I_spec
+            color = color + light["specular_intensity"] * light["color"] * I_spec
 
+            if recursion_level+1>general["max_recursion"]:
+                color = color + primitive_reflection_color * general["background_color"]
+            else:
+                next_primitive = FindIntersection(P, normalize(R))
+                if not math.isinf(next_primitive["min_t"]):
+                    color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
+                                                            next_primitive["min_primitive"],
+                                                            next_primitive["type"], recursion_level + 1)
+                    color = color + color_from_reflection * primitive_reflection_color
+
+    if type == "pln":
+        pln_normal_normalize = normalize(primitive["normal"])
+        N = pln_normal_normalize
+        for light in lights:
+            # need to check if the light intersect other objects before that
+            # soft shadows
+            # TODO
+
+            L = normalize(light["position"] - P)
+            I_p = 1
+            K_d = primitive_diffuse_color
+            I_diff = calculate_I_diff(N, L, I_p, K_d)
+            color = color + I_diff * light["color"]
+
+            R = (sum(2 * L * N)) * N - L
+            Ks = primitive_spec_color
+            I_spec = calculate_Ipec(Ks, I_p, R, V, n)
+            color = color + light["specular_intensity"] * light["color"] * I_spec
+
+            if recursion_level+1>general["max_recursion"]:
+                color = color + primitive_reflection_color * general["background_color"]
+            else:
+                next_primitive = FindIntersection(P, normalize(R))
+                if not math.isinf(next_primitive["min_t"]):
+                    color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
+                                                            next_primitive["min_primitive"],
+                                                            next_primitive["type"], recursion_level + 1)
+                    color = color + color_from_reflection * primitive_reflection_color
     color = [min(x, 1) for x in color]
     color = [max(x, 0) for x in color]
-    #return mtls[primitive["material_index"] - 1]["diffuse_color"]
+    # return mtls[primitive["material_index"] - 1]["diffuse_color"]
     return color
 
 
@@ -183,7 +226,7 @@ def RayCast():
     Vz = (P - E) / f
     M = calculate_M(Vz[0], Vz[1], Vz[2])
     Vx = np.array([M["Cy"], 0, M["Sy"]])
-    Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
+    Vy = np.array([M["Sx"] * M["Sy"], -M["Cx"], -M["Sx"] * M["Cy"]])
 
     width_screen = cam["screen_width"]
     ratio = float(width) / height
@@ -198,19 +241,20 @@ def RayCast():
             # ray
             # p=E+t(p-E)
             t = 1
-            min_object = FindIntersection(E, t, normalize(p - E))
+            min_object = FindIntersection(E, normalize(p - E))
             if math.isinf(min_object["min_t"]):
                 # no intersection object
                 # TODO
                 image[i][j] = [0, 0, 0]
             else:
                 image[i][j] = calculate_color(E, normalize(p - E), min_object["min_t"], min_object["min_primitive"],
-                                              min_object["type"])
+                                              min_object["type"], 0)
 
             # update image
             # TODO
-            p = p + Vx*(width_screen/width)
-        P_0 = P_0 + Vy*(height_screen/height)
+            p = p + Vx * (width_screen / width)
+            print("i : "+str(i)+" j : "+ str(j))
+        P_0 = P_0 + Vy * (height_screen / height)
     return image
 
 
@@ -237,8 +281,8 @@ def normalize_image(image: NDArray):
     """Normalize image pixels to be between [0., 1.0]"""
     min_img = image.min()
     max_img = image.max()
-    #normalized_image = (image - min_img) / (max_img - min_img)
-    normalized_image = image*255
+    # normalized_image = (image - min_img) / (max_img - min_img)
+    normalized_image = image * 255
     return normalized_image
 
 
