@@ -145,79 +145,91 @@ def normalize(v):
 
 
 def calculate_color(E, V, t, primitive, type, recursion_level):
-    print("rec: "+str(recursion_level))
+    #print("rec: "+str(recursion_level))
     if recursion_level > general["max_recursion"]:
         return general["background_color"]
 
     P = E + t * V
     color = np.array([0, 0, 0])
+    diffuse_color = np.array([0, 0, 0])
+    spec_color = np.array([0, 0, 0])
+    reflection_color = np.array([0, 0, 0])
+    background_color = general["background_color"]
+    transperancy_mtl = mtls[primitive["material_index"] - 1]["transparency"]
     primitive_diffuse_color = mtls[primitive["material_index"] - 1]["diffuse_color"]
     primitive_spec_color = mtls[primitive["material_index"] - 1]["specular_color"]
     primitive_reflection_color = mtls[primitive["material_index"] - 1]["reflection_color"]
     n = mtls[primitive["material_index"] - 1]["shininess"]
+    N = np.array([0, 0, 0])
     if type == "sph":
         N = normalize(P - primitive["center"])
-        for light in lights:
-            # need to check if the light intersect other objects before that
-            # soft shadows
-            # TODO
-
-            L = normalize(light["position"] - P)
-            I_p = 1
-            K_d = primitive_diffuse_color
-            I_diff = calculate_I_diff(N, L, I_p, K_d)
-            color = color + I_diff * light["color"]
-
-            R = (sum(2 * L * N)) * N - L
-            Ks = primitive_spec_color
-            I_spec = calculate_Ipec(Ks, I_p, R, V, n)
-            color = color + light["specular_intensity"] * light["color"] * I_spec
-        if recursion_level + 1 > general["max_recursion"]:
-            color = color + primitive_reflection_color * general["background_color"]
-        else:
-            R = V - 2 * (sum(V * N)) * N
-            next_primitive = FindIntersection(P, normalize(R))
-            if not math.isinf(next_primitive["min_t"]):
-                color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
-                                                        next_primitive["min_primitive"],
-                                                        next_primitive["type"], recursion_level + 1)
-                color = color + color_from_reflection * primitive_reflection_color
-
 
     if type == "pln":
         pln_normal_normalize = normalize(primitive["normal"])
         N = pln_normal_normalize
-        for light in lights:
-            # need to check if the light intersect other objects before that
-            # soft shadows
-            # TODO
 
-            L = normalize(light["position"] - P)
-            I_p = 1
-            K_d = primitive_diffuse_color
-            I_diff = calculate_I_diff(N, L, I_p, K_d)
-            color = color + I_diff * light["color"]
+    for light in lights:
+        # need to check if the light intersect other objects before that
+        # soft shadows
+        # TODO
+        L = normalize(light["position"] - P)
+        I_p = soft_shadows(light,general["root_num_of_shadow_rays"],P)
+        K_d = primitive_diffuse_color
+        I_diff = calculate_I_diff(N, L, I_p, K_d)
+        diffuse_color = diffuse_color + I_diff * light["color"]
 
-            R = (sum(2 * L * N)) * N - L
-            Ks = primitive_spec_color
-            I_spec = calculate_Ipec(Ks, I_p, R, V, n)
-            color = color + light["specular_intensity"] * light["color"] * I_spec
-        if recursion_level + 1 > general["max_recursion"]:
-            color = color + primitive_reflection_color * general["background_color"]
-        else:
-            R = V - 2 * (sum(V * N)) * N
-            next_primitive = FindIntersection(P, normalize(R))
-            if not math.isinf(next_primitive["min_t"]):
-                color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
-                                                        next_primitive["min_primitive"],
-                                                        next_primitive["type"], recursion_level + 1)
-                color = color + color_from_reflection * primitive_reflection_color
+        R = (sum(2 * L * N)) * N - L
+        Ks = primitive_spec_color
+        I_spec = calculate_Ipec(Ks, I_p, R, V, n)
+        spec_color = spec_color + light["specular_intensity"] * light["color"] * I_spec
+    if recursion_level + 1 > general["max_recursion"]:
+        reflection_color = reflection_color + primitive_reflection_color * general["background_color"]
+    else:
+        R = V - 2 * (sum(V * N)) * N
+        next_primitive = FindIntersection(P, normalize(R))
+        if not math.isinf(next_primitive["min_t"]):
+            color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
+                                                    next_primitive["min_primitive"],
+                                                    next_primitive["type"], recursion_level + 1)
+            reflection_color = reflection_color + color_from_reflection * primitive_reflection_color
 
-
+    color = background_color*transperancy_mtl + (1-transperancy_mtl)*(diffuse_color+spec_color)+reflection_color
     color = [min(x, 1) for x in color]
     color = [max(x, 0) for x in color]
     # return mtls[primitive["material_index"] - 1]["diffuse_color"]
     return color
+
+def soft_shadows(light,N,intersection_point):
+    sum_hit_rays=0
+    P = light["position"]
+    Vz = normalize(P-intersection_point)
+
+    M = calculate_M(Vz[0], Vz[1], Vz[2])
+    Vx = np.array([M["Cy"], 0, M["Sy"]])
+    Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
+
+    radius = light["radius"]
+    P_0 = P - float(radius/2) * Vx - float(radius/2) * Vy
+
+    for i in range (0,N):
+        p_curr = P_0
+        for j in range (0,N):
+            min_object = FindIntersection(p_curr, normalize(intersection_point-p_curr))
+            t = min_object["min_t"]
+            curr_intersection = p_curr+normalize(intersection_point-p_curr)*t
+            if (intersection_point==curr_intersection).all():
+                sum_hit_rays = sum_hit_rays+1
+            p_curr = p_curr + Vx * (radius / N)
+        P_0 = P_0 + Vy * (radius / N)
+
+    percent_hit_rays = sum_hit_rays/(N*N)
+    shadow_intensity = light["shadow intensity"]
+    light_intensity = 1*(1-shadow_intensity) + shadow_intensity*percent_hit_rays
+    return light_intensity
+
+
+
+
 
 
 def RayCast():
@@ -225,7 +237,7 @@ def RayCast():
     look_at_point = cam["look_at_position"]
     E = cam["pos"]
     f = cam["screen_distance"]
-    P = E + f * normalize(look_at_point - E)
+    P = E + f * normalize(look_at_point - E )
 
     Vz = (P - E) / f
     M = calculate_M(Vz[0], Vz[1], Vz[2])
