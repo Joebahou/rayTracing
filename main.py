@@ -92,7 +92,6 @@ def intersectionBox(E, V, box):
 
 
 def FindIntersection(E, V):
-    # todo: need to do
     min_t = np.inf
     type_p = ""
     min_primitive = {}
@@ -130,8 +129,11 @@ def calculate_M(a, b, c):
 # I_p = light intensity number
 # K_d = [R,G,B] diffuse surface color
 def calculate_I_diff(N, L, I_p, K_d):
-    dot_product = sum(N * L)
-    return dot_product * I_p * K_d
+    dot_product = max(0,sum(N * L))
+    result = dot_product * I_p * K_d
+    result = [min(x, 1) for x in result]
+    result = [max(x, 0) for x in result]
+    return result
 
 
 # I_p = light intensity number
@@ -172,8 +174,7 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
         N = normalize(P-primitive["center"])
 
     for light in lights:
-        # need to check if the light intersect other objects before that
-        # soft shadows
+        #check correction of soft shadows
         # TODO
         L = normalize(light["position"] - P)
         I_p = float(soft_shadows(light,general["root_num_of_shadow_rays"],P))
@@ -184,22 +185,24 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
         R = (sum(2 * L * N)) * N - L
         Ks = primitive_spec_color
         I_spec = calculate_Ipec(Ks, I_p, R, V, n)
-        spec_color = spec_color + light["specular_intensity"] * light["color"] * I_spec
-    #if recursion_level + 1 > general["max_recursion"]:
-        #reflection_color = reflection_color + primitive_reflection_color * general["background_color"]
-    #else:
+        spec_color = spec_color + light["specular_intensity"] * I_spec*light["color"]
+
     R = V - 2 * (sum(V * N)) * N
     next_primitive = FindIntersection(P, normalize(R))
-    if not math.isinf(next_primitive["min_t"]):
+    if not math.isinf(next_primitive["min_t"]) :
+        #TODO what if the intersection is the same primitive?
         color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
                                                 next_primitive["min_primitive"],
                                                 next_primitive["type"], recursion_level + 1)
         reflection_color = reflection_color + color_from_reflection * primitive_reflection_color
-
+    else:
+        reflection_color=background_color*primitive_reflection_color
+    diffuse_color = [min(x, 1) for x in diffuse_color]
+    diffuse_color = [max(x, 0) for x in diffuse_color]
     color = background_color*transperancy_mtl + (1-transperancy_mtl)*(diffuse_color+spec_color)+reflection_color
     color = [min(x, 1) for x in color]
     color = [max(x, 0) for x in color]
-    # return mtls[primitive["material_index"] - 1]["diffuse_color"]
+
     return color
 def equal_array(arr1,arr2):
     epsilon = pow(10, -6)
@@ -207,6 +210,9 @@ def equal_array(arr1,arr2):
         return True
     return False
 def soft_shadows(light,N,intersection_point):
+    #TODO
+    #speed the soft shadows
+
     sum_hit_rays=0
     P = light["position"]
     Vz = normalize(P-intersection_point)
@@ -266,10 +272,7 @@ def RayCast():
     for i in range(height-1,-1,-1):
         p = P_0
         for j in range(0, width):
-            # TODO
-            # ray
-            # p=E+t(p-E)
-            t = 1
+
             min_object = FindIntersection(E, normalize(p - E))
             if math.isinf(min_object["min_t"]):
                 # no intersection object
@@ -279,8 +282,7 @@ def RayCast():
                 image[i][j] = calculate_color(E, normalize(p - E), min_object["min_t"], min_object["min_primitive"],
                                               min_object["type"], 0)
 
-            # update image
-            # TODO
+
             p = p + Vx * (width_screen / width)
             print("i : "+str(i)+" j : "+ str(j))
         P_0 = P_0 + Vy * (height_screen / height)
@@ -296,8 +298,7 @@ def parsing_scene():
     output_image_name = sys.argv[2]
 
     if len(sys.argv) > 3:
-        # TODO
-        # change the global width,height
+
         global width
         global height
         width = int(sys.argv[3])

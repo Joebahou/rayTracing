@@ -5,7 +5,7 @@ cam = {}
 general = {}
 mtls = list()
 plns = list()
-
+index_primitive = 0
 # [{center:[x,y,z],radius:number,mat_index:number}]
 spheres = list()
 lights = list()
@@ -43,6 +43,9 @@ def get_args_pln(words):
     pln["normal"] = np.array([float(words[1].strip()), float(words[2].strip()), float(words[3].strip())])
     pln["offset"] = float(words[4].strip())
     pln["material_index"] = int(words[5].strip())
+    global index_primitive
+    pln["index"]=index_primitive
+    index_primitive=index_primitive+1
     plns.append(pln)
 
 
@@ -51,6 +54,9 @@ def get_args_sphere(words):
     sph["center"] = np.array([float(words[1].strip()), float(words[2].strip()), float(words[3].strip())])
     sph["radius"] = float(words[4].strip())
     sph["material_index"] = int(words[5].strip())
+    global index_primitive
+    sph["index"]=index_primitive
+    index_primitive = index_primitive + 1
     spheres.append(sph)
 
 
@@ -69,11 +75,15 @@ def get_args_box(words):
     box["center"] = np.array([float(words[1].strip()), float(words[2].strip()), float(words[3].strip())])
     box["scale"] = float(words[4].strip())
     box["material_index"] = int(words[5].strip())
+    global index_primitive
+    box["index"]=index_primitive
+    index_primitive = index_primitive + 1
     boxes.append(box)
 
 
 def scene_definition_parser(file_name):
     f = open(file_name, "r")
+    index_primitive=0
 
     for line in f:
         line=line.strip()
