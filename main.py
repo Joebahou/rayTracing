@@ -7,6 +7,7 @@ from typing import Dict, Any
 from PIL import Image
 from parsing import cam, general, mtls, plns, spheres, lights, boxes
 from parsing import scene_definition_parser
+import random
 
 NDArray = Any
 Options = Any
@@ -167,6 +168,8 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
     if type == "pln":
         pln_normal_normalize = normalize(primitive["normal"])
         N = pln_normal_normalize
+    if type == "box":
+        N = normalize(P-primitive["center"])
 
     for light in lights:
         # need to check if the light intersect other objects before that
@@ -214,18 +217,21 @@ def soft_shadows(light,N,intersection_point):
     Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
 
     radius = light["radius"]
-    P_0 = P - float(radius) * Vx - float(radius) * Vy
+    P_0 = P - float(radius/2) * Vx - float(radius/2) * Vy
 
     for i in range (0,N):
         p_curr = P_0
         for j in range (0,N):
-            min_object = FindIntersection(p_curr, normalize(intersection_point-p_curr))
+            random_x = random.random()
+            random_y = random.random()
+            p_random = p_curr + (radius/N)*random_x*Vx + (radius/N)*random_y*Vy
+            min_object = FindIntersection(p_random, normalize(intersection_point-p_random))
             t = min_object["min_t"]
-            curr_intersection = p_curr+normalize(intersection_point-p_curr)*t
+            curr_intersection = p_random+normalize(intersection_point-p_random  )*t
             if equal_array(intersection_point,curr_intersection):
                 sum_hit_rays = sum_hit_rays+1
-            p_curr = p_curr + Vx * (2*radius / N)
-        P_0 = P_0 + Vy * (2*radius / N)
+            p_curr = p_curr + Vx * (radius / N)
+        P_0 = P_0 + Vy * (radius / N)
 
     percent_hit_rays = sum_hit_rays/(float(N)*N)
 

@@ -59,7 +59,7 @@ def get_args_lgt(words):
     lgt["position"] = np.array([float(words[1].strip()), float(words[2].strip()), float(words[3].strip())])
     lgt["color"] = np.array([float(words[4].strip()), float(words[5].strip()), float(words[6].strip())])
     lgt["specular_intensity"] = float(words[7].strip())
-    lgt["shadow intensity"] = float(words[8].strip())
+    lgt["shadow_intensity"] = float(words[8].strip())
     lgt["radius"] = float(words[9].strip())
     lights.append(lgt)
 
