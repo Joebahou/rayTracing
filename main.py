@@ -19,6 +19,31 @@ output_image_name = ""
 width = 500
 height = 500
 
+def FindIntersection_shadow(E, V,t_intersection):
+    min_t = np.inf
+    type_p = ""
+    min_primitive = {}
+    epsilon = pow(10, -6)
+    for sph in spheres:
+        t = intersectionSphere(E, V, sph)
+        if 0 < t < t_intersection and not abs(t-t_intersection)<=epsilon:
+            #if t<t_intersection and not abs(t-t_intersection)<=epsilon:
+            return 0
+
+    for pln in plns:
+        t = intersectionPln(E, V, pln)
+        if 0 < t < t_intersection and not abs(t-t_intersection)<=epsilon:
+            #if t<t_intersection and not abs(t-t_intersection)<=epsilon:
+            return 0
+
+    for box in boxes:
+        t = intersectionBox(E, V, box)
+        if 0 < t < t_intersection and not abs(t-t_intersection)<=epsilon:
+            #if t<t_intersection and not abs(t-t_intersection)<=epsilon:
+            return 0
+    return 1
+
+
 
 def intersectionSphere(E, V, sph):
     O = sph["center"]
@@ -145,7 +170,8 @@ def calculate_Ipec(K_s, I_p, R, V, n):
 
 def normalize(v):
     return v / math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
-
+def normal(v):
+    return math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
 
 def calculate_color(E, V, t, primitive, type, recursion_level):
     #print("rec: "+str(recursion_level))
@@ -178,6 +204,7 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
         # TODO
         L = normalize(light["position"] - P)
         I_p = float(soft_shadows(light,general["root_num_of_shadow_rays"],P))
+        #I_p=1
         K_d = primitive_diffuse_color
         I_diff = calculate_I_diff(N, L, I_p, K_d)
         diffuse_color = diffuse_color + I_diff * light["color"]
@@ -191,10 +218,12 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
     next_primitive = FindIntersection(P, normalize(R))
     if not math.isinf(next_primitive["min_t"]) :
         #TODO what if the intersection is the same primitive?
+
         color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
                                                 next_primitive["min_primitive"],
                                                 next_primitive["type"], recursion_level + 1)
         reflection_color = reflection_color + color_from_reflection * primitive_reflection_color
+
     else:
         reflection_color=background_color*primitive_reflection_color
     diffuse_color = [min(x, 1) for x in diffuse_color]
@@ -215,7 +244,7 @@ def soft_shadows(light,N,intersection_point):
 
     sum_hit_rays=0
     P = light["position"]
-    Vz = normalize(P-intersection_point)
+    Vz = normalize(intersection_point-P)
 
 
     M = calculate_M(Vz[0], Vz[1], Vz[2])
@@ -231,14 +260,20 @@ def soft_shadows(light,N,intersection_point):
             random_x = random.random()
             random_y = random.random()
             p_random = p_curr + (radius/N)*random_x*Vx + (radius/N)*random_y*Vy
+
+            ray = normalize(intersection_point-p_random)
+            t_inter = normal(intersection_point-p_random)
+            sum_hit_rays = sum_hit_rays + FindIntersection_shadow(p_random, ray, t_inter)
+            '''
             min_object = FindIntersection(p_random, normalize(intersection_point-p_random))
             t = min_object["min_t"]
             curr_intersection = p_random+normalize(intersection_point-p_random  )*t
             if equal_array(intersection_point,curr_intersection):
                 sum_hit_rays = sum_hit_rays+1
+            '''
             p_curr = p_curr + Vx * (radius / N)
         P_0 = P_0 + Vy * (radius / N)
-
+    #print("sum: "+str(sum_hit_rays))
     percent_hit_rays = sum_hit_rays/(float(N)*N)
 
     shadow_intensity = light["shadow_intensity"]
