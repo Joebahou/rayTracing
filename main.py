@@ -291,12 +291,17 @@ def RayCast():
     look_at_point = cam["look_at_position"]
     E = cam["pos"]
     f = cam["screen_distance"]
+    up_input = cam["up_vector"]
     P = E + f * normalize(look_at_point - E )
 
     Vz = (P - E) / f
-    M = calculate_M(Vz[0], Vz[1], Vz[2])
-    Vx = np.array([M["Cy"], 0, M["Sy"]])
-    Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
+    right = normalize(np.cross(up_input,Vz))
+    up_vector = normalize(np.cross(Vz,right))
+    Vy = up_vector
+    Vx = right
+    #M = calculate_M(Vz[0], Vz[1], Vz[2])
+    #Vx = np.array([M["Cy"], 0, M["Sy"]])
+    #Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
 
     width_screen = cam["screen_width"]
     ratio = float(width) / height
