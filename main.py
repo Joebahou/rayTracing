@@ -407,11 +407,15 @@ def save_image(image: NDArray, image_loc: str):
 
 
 if __name__ == "__main__":
+    import time
+
+    start_time = time.time()
     parsing_scene()
     image = RayCast()
     # image = np.zeros((100, 100, 3), dtype=np.float64)
     # image[0][0]=[1,0,0]
     save_image(image, output_image_name)
+    print("--- %s seconds ---" % (time.time() - start_time))
     # a = np.array([1, 2, 3])
     # b = np.array([1, 2, 3])
     # print(float(1 / 3) * a)
