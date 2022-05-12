@@ -19,30 +19,30 @@ output_image_name = ""
 width = 500
 height = 500
 
-def FindIntersection_shadow(E, V,t_intersection):
+
+def FindIntersection_shadow(E, V, t_intersection):
     min_t = np.inf
     type_p = ""
     min_primitive = {}
     epsilon = pow(10, -6)
     for sph in spheres:
         t = intersectionSphere(E, V, sph)
-        if 0 < t < t_intersection and not abs(t-t_intersection)<=epsilon:
-            #if t<t_intersection and not abs(t-t_intersection)<=epsilon:
+        if 0 < t < t_intersection and not abs(t - t_intersection) <= epsilon:
+            # if t<t_intersection and not abs(t-t_intersection)<=epsilon:
             return 0
 
     for pln in plns:
         t = intersectionPln(E, V, pln)
-        if 0 < t < t_intersection and not abs(t-t_intersection)<=epsilon:
-            #if t<t_intersection and not abs(t-t_intersection)<=epsilon:
+        if 0 < t < t_intersection and not abs(t - t_intersection) <= epsilon:
+            # if t<t_intersection and not abs(t-t_intersection)<=epsilon:
             return 0
 
     for box in boxes:
         t = intersectionBox(E, V, box)
-        if 0 < t < t_intersection and not abs(t-t_intersection)<=epsilon:
-            #if t<t_intersection and not abs(t-t_intersection)<=epsilon:
+        if 0 < t < t_intersection and not abs(t - t_intersection) <= epsilon:
+            # if t<t_intersection and not abs(t-t_intersection)<=epsilon:
             return 0
     return 1
-
 
 
 def intersectionSphere(E, V, sph):
@@ -64,6 +64,9 @@ def intersectionSphere(E, V, sph):
 def intersectionPln(E, V, pln):
     N = pln["normal"]
     c = pln["offset"]
+    epsilon = pow(10, -6)
+    if sum(V * N) == 0:
+        return 0
     t = (-1) * (sum(E * N) - c) / sum(V * N)
     return t
 
@@ -154,7 +157,7 @@ def calculate_M(a, b, c):
 # I_p = light intensity number
 # K_d = [R,G,B] diffuse surface color
 def calculate_I_diff(N, L, I_p, K_d):
-    dot_product = max(0,sum(N * L))
+    dot_product = max(0, sum(N * L))
     result = dot_product * I_p * K_d
     result = [min(x, 1) for x in result]
     result = [max(x, 0) for x in result]
@@ -170,11 +173,44 @@ def calculate_Ipec(K_s, I_p, R, V, n):
 
 def normalize(v):
     return v / math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+
+
 def normal(v):
     return math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
 
+
+def calculate_normal_box(box, P):
+    epsilon = pow(10, -6)
+    center_box = box["center"]
+    radius_box = box["scale"]
+
+    front_mid = np.array([center_box[0], center_box[1], center_box[2] + radius_box / 2])
+    back_mid = np.array([center_box[0], center_box[1], center_box[2] - radius_box / 2])
+
+    right_mid = np.array([center_box[0] + radius_box / 2, center_box[1], center_box[2]])
+    left_mid = np.array([center_box[0] - radius_box / 2, center_box[1], center_box[2]])
+
+    up_mid = np.array([center_box[0], center_box[1] + radius_box / 2, center_box[2]])
+    down_mid = np.array([center_box[0], center_box[1] - radius_box / 2, center_box[2]])
+
+    if abs(P[2] - front_mid[2]) <= epsilon:
+        return normalize(front_mid - center_box)
+    if abs(P[2] - back_mid[2]) <= epsilon:
+        return normalize(back_mid - center_box)
+
+    if abs(P[0] - right_mid[0]) <= epsilon:
+        return normalize(right_mid - center_box)
+
+    if abs(P[0] - left_mid[0]) <= epsilon:
+        return normalize(left_mid - center_box)
+
+    if abs(P[1] - up_mid[1]) <= epsilon:
+        return normalize(up_mid - center_box)
+    return normalize(down_mid - center_box)
+
+
 def calculate_color(E, V, t, primitive, type, recursion_level):
-    #print("rec: "+str(recursion_level))
+    # print("rec: "+str(recursion_level))
     if recursion_level > general["max_recursion"]:
         return general["background_color"]
 
@@ -197,14 +233,14 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
         pln_normal_normalize = normalize(primitive["normal"])
         N = pln_normal_normalize
     if type == "box":
-        N = normalize(P-primitive["center"])
+        N = calculate_normal_box(primitive, P)
 
     for light in lights:
-        #check correction of soft shadows
+        # check correction of soft shadows
         # TODO
         L = normalize(light["position"] - P)
-        I_p = float(soft_shadows(light,general["root_num_of_shadow_rays"],P))
-        #I_p=1
+        I_p = float(soft_shadows(light, general["root_num_of_shadow_rays"], P))
+        # I_p=1
         K_d = primitive_diffuse_color
         I_diff = calculate_I_diff(N, L, I_p, K_d)
         diffuse_color = diffuse_color + I_diff * light["color"]
@@ -212,12 +248,12 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
         R = (sum(2 * L * N)) * N - L
         Ks = primitive_spec_color
         I_spec = calculate_Ipec(Ks, I_p, R, V, n)
-        spec_color = spec_color + light["specular_intensity"] * I_spec*light["color"]
+        spec_color = spec_color + light["specular_intensity"] * I_spec * light["color"]
 
     R = V - 2 * (sum(V * N)) * N
     next_primitive = FindIntersection(P, normalize(R))
-    if not math.isinf(next_primitive["min_t"]) :
-        #TODO what if the intersection is the same primitive?
+    if not math.isinf(next_primitive["min_t"]):
+        # TODO what if the intersection is the same primitive?
 
         color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
                                                 next_primitive["min_primitive"],
@@ -225,44 +261,52 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
         reflection_color = reflection_color + color_from_reflection * primitive_reflection_color
 
     else:
-        reflection_color=background_color*primitive_reflection_color
+        reflection_color = background_color * primitive_reflection_color
     diffuse_color = [min(x, 1) for x in diffuse_color]
     diffuse_color = [max(x, 0) for x in diffuse_color]
-    color = background_color*transperancy_mtl + (1-transperancy_mtl)*(diffuse_color+spec_color)+reflection_color
+    color = background_color * transperancy_mtl + (1 - transperancy_mtl) * (
+            diffuse_color + spec_color) + reflection_color
     color = [min(x, 1) for x in color]
     color = [max(x, 0) for x in color]
 
     return color
-def equal_array(arr1,arr2):
+
+
+def equal_array(arr1, arr2):
     epsilon = pow(10, -6)
-    if abs(arr1[0]-arr2[0])<=epsilon and abs(arr1[1]-arr2[1])<=epsilon and abs(arr1[2]-arr2[2])<=epsilon:
+    if abs(arr1[0] - arr2[0]) <= epsilon and abs(arr1[1] - arr2[1]) <= epsilon and abs(arr1[2] - arr2[2]) <= epsilon:
         return True
     return False
-def soft_shadows(light,N,intersection_point):
-    #TODO
-    #speed the soft shadows
 
-    sum_hit_rays=0
+
+def soft_shadows(light, N, intersection_point):
+    # TODO
+    # speed the soft shadows
+
+    sum_hit_rays = 0
     P = light["position"]
-    Vz = normalize(intersection_point-P)
-
-
-    M = calculate_M(Vz[0], Vz[1], Vz[2])
-    Vx = np.array([M["Cy"], 0, M["Sy"]])
-    Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
+    Vz = normalize(intersection_point - P)
+    up_input = np.array([0,1,0])
+    right = normalize(np.cross(up_input, Vz))
+    up_vector = normalize(np.cross(Vz, right))
+    Vy = up_vector
+    Vx = right
+   #M = calculate_M(Vz[0], Vz[1], Vz[2])
+    #Vx = np.array([M["Cy"], 0, M["Sy"]])
+    #Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
 
     radius = light["radius"]
-    P_0 = P - float(radius/2) * Vx - float(radius/2) * Vy
+    P_0 = P - float(radius / 2) * Vx - float(radius / 2) * Vy
 
-    for i in range (0,N):
+    for i in range(0, N):
         p_curr = P_0
-        for j in range (0,N):
+        for j in range(0, N):
             random_x = random.random()
             random_y = random.random()
-            p_random = p_curr + (radius/N)*random_x*Vx + (radius/N)*random_y*Vy
+            p_random = p_curr + (radius / N) * random_x * Vx + (radius / N) * random_y * Vy
 
-            ray = normalize(intersection_point-p_random)
-            t_inter = normal(intersection_point-p_random)
+            ray = normalize(intersection_point - p_random)
+            t_inter = normal(intersection_point - p_random)
             sum_hit_rays = sum_hit_rays + FindIntersection_shadow(p_random, ray, t_inter)
             '''
             min_object = FindIntersection(p_random, normalize(intersection_point-p_random))
@@ -273,17 +317,13 @@ def soft_shadows(light,N,intersection_point):
             '''
             p_curr = p_curr + Vx * (radius / N)
         P_0 = P_0 + Vy * (radius / N)
-    #print("sum: "+str(sum_hit_rays))
-    percent_hit_rays = sum_hit_rays/(float(N)*N)
+    # print("sum: "+str(sum_hit_rays))
+    percent_hit_rays = sum_hit_rays / (float(N) * N)
 
     shadow_intensity = light["shadow_intensity"]
-    light_intensity = 1*(1-shadow_intensity) + shadow_intensity*percent_hit_rays
-    #print(light_intensity)
+    light_intensity = 1 * (1 - shadow_intensity) + shadow_intensity * percent_hit_rays
+    # print(light_intensity)
     return light_intensity
-
-
-
-
 
 
 def RayCast():
@@ -292,16 +332,16 @@ def RayCast():
     E = cam["pos"]
     f = cam["screen_distance"]
     up_input = cam["up_vector"]
-    P = E + f * normalize(look_at_point - E )
+    P = E + f * normalize(look_at_point - E)
 
     Vz = (P - E) / f
-    right = normalize(np.cross(up_input,Vz))
-    up_vector = normalize(np.cross(Vz,right))
+    right = normalize(np.cross(up_input, Vz))
+    up_vector = normalize(np.cross(Vz, right))
     Vy = up_vector
     Vx = right
-    #M = calculate_M(Vz[0], Vz[1], Vz[2])
-    #Vx = np.array([M["Cy"], 0, M["Sy"]])
-    #Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
+    # M = calculate_M(Vz[0], Vz[1], Vz[2])
+    # Vx = np.array([M["Cy"], 0, M["Sy"]])
+    # Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
 
     width_screen = cam["screen_width"]
     ratio = float(width) / height
@@ -309,7 +349,7 @@ def RayCast():
 
     P_0 = P - float(width_screen / 2) * Vx - float(height_screen / 2) * Vy
 
-    for i in range(height-1,-1,-1):
+    for i in range(height - 1, -1, -1):
         p = P_0
         for j in range(0, width):
 
@@ -322,9 +362,8 @@ def RayCast():
                 image[i][j] = calculate_color(E, normalize(p - E), min_object["min_t"], min_object["min_primitive"],
                                               min_object["type"], 0)
 
-
             p = p + Vx * (width_screen / width)
-            print("i : "+str(i)+" j : "+ str(j))
+            print("i : " + str(i) + " j : " + str(j))
         P_0 = P_0 + Vy * (height_screen / height)
     return image
 
@@ -338,7 +377,6 @@ def parsing_scene():
     output_image_name = sys.argv[2]
 
     if len(sys.argv) > 3:
-
         global width
         global height
         width = int(sys.argv[3])
@@ -371,8 +409,8 @@ def save_image(image: NDArray, image_loc: str):
 if __name__ == "__main__":
     parsing_scene()
     image = RayCast()
-    #image = np.zeros((100, 100, 3), dtype=np.float64)
-    #image[0][0]=[1,0,0]
+    # image = np.zeros((100, 100, 3), dtype=np.float64)
+    # image[0][0]=[1,0,0]
     save_image(image, output_image_name)
     # a = np.array([1, 2, 3])
     # b = np.array([1, 2, 3])
