@@ -64,7 +64,6 @@ def intersectionSphere(E, V, sph):
 def intersectionPln(E, V, pln):
     N = pln["normal"]
     c = pln["offset"]
-    epsilon = pow(10, -6)
     if sum(V * N) == 0:
         return 0
     t = (-1) * (sum(E * N) - c) / sum(V * N)
@@ -145,14 +144,14 @@ def FindIntersection(E, V):
             type_p = "box"
     return {"min_t": min_t, "min_primitive": min_primitive, "type": type_p}
 
-
+'''
 def calculate_M(a, b, c):
     Sx = -b
     Cx = math.sqrt(1 - Sx * Sx)
     Sy = (-a) / Cx
     Cy = c / Cx
     return {"Sx": Sx, "Cx": Cx, "Sy": Sy, "Cy": Cy}
-
+'''
 
 # I_p = light intensity number
 # K_d = [R,G,B] diffuse surface color
@@ -336,7 +335,11 @@ def RayCast():
 
     Vz = (P - E) / f
     right = normalize(np.cross(up_input, Vz))
-    up_vector = normalize(np.cross(Vz, right))
+    fixed_up_vector = normalize(np.cross(right,Vz))
+    if sum(fixed_up_vector*up_input)>0:
+        up_vector=fixed_up_vector
+    else:
+        up_vector=fixed_up_vector*(-1)
     Vy = up_vector
     Vx = right
     # M = calculate_M(Vz[0], Vz[1], Vz[2])
