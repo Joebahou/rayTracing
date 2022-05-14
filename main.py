@@ -85,6 +85,7 @@ def intersectionPln(E, V, pln):
 
 # returns min t of intersection with pln
 # if no intersection returns 0
+# Algorithm for intersection with box we took from https://web.cse.ohio-state.edu/~shen.94/681/Site/Slides_files/basic_algo.pdf
 # @param E :point that we shoot the ray from
 # @param V : direction of the ray
 # @param box : the box we intersect with
