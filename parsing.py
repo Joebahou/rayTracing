@@ -87,7 +87,6 @@ def scene_definition_parser(file_name):
 
     for line in f:
         line=line.strip()
-
         if not (line.startswith("#") or len(line.strip()) == 0):
             words = line.replace("\t"," ")
             words = words.split(" ")
@@ -104,6 +103,7 @@ def scene_definition_parser(file_name):
                 "lgt": lambda: get_args_lgt(input_line),
                 "box": lambda: get_args_box(input_line)
             }
-            cases.get(input_line[0], lambda: print("Didn't match a case"))()
+            if len(input_line) > 0:
+                cases.get(input_line[0], lambda: print("Didn't match a case"))()
 
     f.close()

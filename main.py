@@ -3,6 +3,7 @@ import numpy as np
 import math
 import os
 from typing import Dict, Any
+import time
 
 from PIL import Image
 from parsing import cam, general, mtls, plns, spheres, lights, boxes
@@ -18,32 +19,26 @@ width = 500
 height = 500
 
 
-# returns min t of instersection of shadow ray.
+# returns min t of intersection of shadow ray.
 # if no intersection returns 0
 # @param E :point that we shoot the ray from
 # @param V : direction of the ray
 # @param t_intersection : the original t intersection we calculate light intensity for
 def FindIntersection_shadow(E, V, t_intersection):
-    min_t = np.inf
-    type_p = ""
-    min_primitive = {}
     epsilon = pow(10, -6)
     for sph in spheres:
         t = intersectionSphere(E, V, sph)
         if 0 < t < t_intersection and not abs(t - t_intersection) <= epsilon:
-            # if t<t_intersection and not abs(t-t_intersection)<=epsilon:
             return 0
 
     for pln in plns:
         t = intersectionPln(E, V, pln)
         if 0 < t < t_intersection and not abs(t - t_intersection) <= epsilon:
-            # if t<t_intersection and not abs(t-t_intersection)<=epsilon:
             return 0
 
     for box in boxes:
         t = intersectionBox(E, V, box)
         if 0 < t < t_intersection and not abs(t - t_intersection) <= epsilon:
-            # if t<t_intersection and not abs(t-t_intersection)<=epsilon:
             return 0
     return 1
 
@@ -83,13 +78,12 @@ def intersectionPln(E, V, pln):
     return t
 
 
-# returns min t of intersection with pln
-# if no intersection returns 0
+# returns min t of intersection with box.
+# if no intersection returns 0.
 # Algorithm for intersection with box we took from https://web.cse.ohio-state.edu/~shen.94/681/Site/Slides_files/basic_algo.pdf
 # @param E :point that we shoot the ray from
 # @param V : direction of the ray
-# @param box : the box we intersect with
-# box: {center:[x,y,z],scale:number,"material_index":number}
+# @param box : the box we intersect with box: {center:[x,y,z],scale:number,"material_index":number}
 def intersectionBox(E, V, box):
     t_near = -np.inf
     t_far = np.inf
@@ -166,14 +160,6 @@ def FindIntersection(E, V):
     return {"min_t": min_t, "min_primitive": min_primitive, "type": type_p}
 
 
-'''
-def calculate_M(a, b, c):
-    Sx = -b
-    Cx = math.sqrt(1 - Sx * Sx)
-    Sy = (-a) / Cx
-    Cy = c / Cx
-    return {"Sx": Sx, "Cx": Cx, "Sy": Sy, "Cy": Cy}
-'''
 
 
 # returns the I_diff of intersection point of ray
@@ -199,15 +185,20 @@ def calculate_Ipec(K_s, I_p, R, V, n):
     dot_product = max(-sum(R * V), 0)
     return math.pow(dot_product, n) * I_p * K_s
 
-#returns the normalized vector of v
-def normalize(v):
-    return v / math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
 
-#returns normal of a vector
+# returns the normalized vector of v
+def normalize(v):
+    if normal(v)!= 0:
+        return v / math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    return v
+
+
+# returns normal of a vector
 def normal(v):
     return math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
 
-#returns normal for the point on a box
+
+# returns normal for the point on a box
 def calculate_normal_box(box, P):
     epsilon = pow(10, -6)
     center_box = box["center"]
@@ -237,7 +228,8 @@ def calculate_normal_box(box, P):
         return normalize(up_mid - center_box)
     return normalize(down_mid - center_box)
 
-#returns color of the min intersection point of a ray
+
+# returns color of the min intersection point of a ray
 # @param E :point that we shoot the ray from
 # @param V : direction of the ray
 # @param t : offset on the ray V(the intersection point)
@@ -245,7 +237,6 @@ def calculate_normal_box(box, P):
 # @param type : type of the primitive. can be "box","pln","sph".
 # @param recursion_level : in what recursion level we are at.
 def calculate_color(E, V, t, primitive, type, recursion_level):
-    # print("rec: "+str(recursion_level))
     if recursion_level > general["max_recursion"]:
         return general["background_color"]
 
@@ -261,20 +252,20 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
     primitive_reflection_color = mtls[primitive["material_index"] - 1]["reflection_color"]
     n = mtls[primitive["material_index"] - 1]["shininess"]
     N = np.array([0, 0, 0])
+
     if type == "sph":
         N = normalize(P - primitive["center"])
 
     if type == "pln":
         pln_normal_normalize = normalize(primitive["normal"])
         N = pln_normal_normalize
+
     if type == "box":
         N = calculate_normal_box(primitive, P)
 
     for light in lights:
-
         L = normalize(light["position"] - P)
         I_p = float(soft_shadows(light, general["root_num_of_shadow_rays"], P))
-        # I_p=1
         K_d = primitive_diffuse_color
         I_diff = calculate_I_diff(N, L, I_p, K_d)
         diffuse_color = diffuse_color + I_diff * light["color"]
@@ -287,8 +278,6 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
     R = V - 2 * (sum(V * N)) * N
     next_primitive = FindIntersection(P, normalize(R))
     if not math.isinf(next_primitive["min_t"]):
-        # TODO what if the intersection is the same primitive?
-
         color_from_reflection = calculate_color(P, normalize(R), next_primitive["min_t"],
                                                 next_primitive["min_primitive"],
                                                 next_primitive["type"], recursion_level + 1)
@@ -298,28 +287,21 @@ def calculate_color(E, V, t, primitive, type, recursion_level):
         reflection_color = background_color * primitive_reflection_color
     diffuse_color = [min(x, 1) for x in diffuse_color]
     diffuse_color = [max(x, 0) for x in diffuse_color]
-    color = background_color * transperancy_mtl + (1 - transperancy_mtl) * (
-            diffuse_color + spec_color) + reflection_color
+    color = background_color * transperancy_mtl +\
+            (1 - transperancy_mtl) * (diffuse_color + spec_color) + reflection_color
     color = [min(x, 1) for x in color]
     color = [max(x, 0) for x in color]
 
     return color
 
-'''
-def equal_array(arr1, arr2):
-    epsilon = pow(10, -6)
-    if abs(arr1[0] - arr2[0]) <= epsilon and abs(arr1[1] - arr2[1]) <= epsilon and abs(arr1[2] - arr2[2]) <= epsilon:
-        return True
-    return False
-'''
 
-#calculates the soft shadows for intersection point. returns light intensity of the point.
+
+# calculates the soft shadows for intersection point. returns light intensity of the point.
 # @param light :dictionary of the light
 # @param N :normal to the surface
 # @param intersection_point the intersection point we calculate the light intensity for.
+
 def soft_shadows(light, N, intersection_point):
-
-
     sum_hit_rays = 0
     P = light["position"]
     Vz = normalize(intersection_point - P)
@@ -328,9 +310,6 @@ def soft_shadows(light, N, intersection_point):
     up_vector = normalize(np.cross(Vz, right))
     Vy = up_vector
     Vx = right
-    # M = calculate_M(Vz[0], Vz[1], Vz[2])
-    # Vx = np.array([M["Cy"], 0, M["Sy"]])
-    # Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
 
     radius = light["radius"]
     P_0 = P - float(radius / 2) * Vx - float(radius / 2) * Vy
@@ -345,25 +324,18 @@ def soft_shadows(light, N, intersection_point):
             ray = normalize(intersection_point - p_random)
             t_inter = normal(intersection_point - p_random)
             sum_hit_rays = sum_hit_rays + FindIntersection_shadow(p_random, ray, t_inter)
-            '''
-            min_object = FindIntersection(p_random, normalize(intersection_point-p_random))
-            t = min_object["min_t"]
-            curr_intersection = p_random+normalize(intersection_point-p_random  )*t
-            if equal_array(intersection_point,curr_intersection):
-                sum_hit_rays = sum_hit_rays+1
-            '''
+
             p_curr = p_curr + Vx * (radius / N)
         P_0 = P_0 + Vy * (radius / N)
-    # print("sum: "+str(sum_hit_rays))
     percent_hit_rays = sum_hit_rays / (float(N) * N)
 
     shadow_intensity = light["shadow_intensity"]
     light_intensity = 1 * (1 - shadow_intensity) + shadow_intensity * percent_hit_rays
-    # print(light_intensity)
     return light_intensity
 
-#main function of ray casting.
-#returns the final image.
+
+# main function of ray casting.
+# returns the final image.
 def RayCast():
     image = np.zeros((height, width, 3), dtype=np.float64)
     look_at_point = cam["look_at_position"]
@@ -381,9 +353,6 @@ def RayCast():
         up_vector = fixed_up_vector * (-1)
     Vy = up_vector
     Vx = right
-    # M = calculate_M(Vz[0], Vz[1], Vz[2])
-    # Vx = np.array([M["Cy"], 0, M["Sy"]])
-    # Vy = np.array([-M["Sx"] * M["Sy"], M["Cx"], M["Sx"] * M["Cy"]])
 
     width_screen = cam["screen_width"]
     ratio = float(width) / height
@@ -403,11 +372,12 @@ def RayCast():
                                               min_object["type"], 0)
 
             p = p + Vx * (width_screen / width)
-            print("i : " + str(i) + " j : " + str(j))
+        print("i : " + str(i))
         P_0 = P_0 + Vy * (height_screen / height)
     return image
 
-#parsing the scene and update the global fields of the scene.
+
+# parsing the scene and update the global fields of the scene.
 def parsing_scene():
     """A Helper function that defines the program arguments."""
 
@@ -448,14 +418,9 @@ def save_image(image: NDArray, image_loc: str):
 
 if __name__ == "__main__":
     import time
-
     start_time = time.time()
     parsing_scene()
     image = RayCast()
-    # image = np.zeros((100, 100, 3), dtype=np.float64)
-    # image[0][0]=[1,0,0]
     save_image(image, output_image_name)
     print("--- %s seconds ---" % (time.time() - start_time))
-    # a = np.array([1, 2, 3])
-    # b = np.array([1, 2, 3])
-    # print(float(1 / 3) * a)
+
